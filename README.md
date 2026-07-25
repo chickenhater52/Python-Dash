@@ -1,7 +1,7 @@
 # Python Dash
 A work-in-progress port of Geometry Dash built with Python, GTK, and Cairo. 
 
-This project is based on [Web Dashers](https://github.com/web-dashers/web-dashers.github.io).
+This project is based on [Web Dashers](https://github.com/web-dashers/web-dashers.github.io) by Pinkdev and Rohanis.
 
 ## Goal
 The main goal of this project is to run completely using preinstalled tools and libraries, requiring no extra package installations.
