@@ -11,3 +11,8 @@ The project is still being updated.
 
 ## Contributing
 If you can, I would be grateful if you can make pull requests and make this port wayyy better than it is currently.
+
+
+
+
+If you wanna run it, go to the root of the scripts folder and run python3 main.py
