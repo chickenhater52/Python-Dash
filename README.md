@@ -15,4 +15,4 @@ If you can, I would be grateful if you can make pull requests and make this port
 
 
 
-If you wanna run it, go to the root of the scripts folder and run python3 main.py
+If you wanna run it, go to the root of the scripts folder and run ```python3 main.py```
