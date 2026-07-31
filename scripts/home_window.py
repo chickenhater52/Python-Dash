@@ -521,9 +521,9 @@ class GDHomeScreen(Gtk.Window):
         self.target_level_index = (self.current_level_index + direction) % len(LEVELS)
         self.slide_dir = direction
         self.slide_state = "out"
-        self.spring_x = 0.0
-        self.spring_velocity = 0.0
-        self.slide_speed_boost = abs(initial_velocity) * 200.0
+        if not self.is_dragging_level:
+            self.spring_x = 0.0
+        self.slide_speed_boost = min(1000.0, abs(initial_velocity) * 2.0)
         if self.controls_win:
             self.controls_win.update_popup_controls()
 

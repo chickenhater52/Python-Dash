@@ -1,7 +1,7 @@
 import math
 import cairo
 from config import LEVELS, LEVEL_COLORS, find_asset_path
-from rendering import draw_rounded_rect, draw_scale9, draw_procedural_diff_icon, draw_progress_bar_custom
+from rendering import draw_rounded_rect, draw_scale9, draw_procedural_diff_icon, draw_progress_bar_custom, ensure_xrender_surf
 from popups import draw_newgrounds_popup, draw_settings_popup_custom, draw_graphics_popup
 from gui_elements import VirtualElement
 
@@ -42,6 +42,20 @@ def draw_home_screen(win, cr):
     cr.scale(scale_factor, scale_factor)
     cr.rectangle(0, 0, 1280, 720)
     cr.clip()
+
+    # Promote UI and background surfaces once to target XRender
+    if win.button_surface: win.button_surface = ensure_xrender_surf(cr, win.button_surface)
+    if win.square_surface: win.square_surface = ensure_xrender_surf(cr, win.square_surface)
+    if win.bg_surface: win.bg_surface = ensure_xrender_surf(cr, win.bg_surface)
+    if win.ground_surface: win.ground_surface = ensure_xrender_surf(cr, win.ground_surface)
+    if win.floor_line_surface: win.floor_line_surface = ensure_xrender_surf(cr, win.floor_line_surface)
+    if win.top_bar_surface: win.top_bar_surface = ensure_xrender_surf(cr, win.top_bar_surface)
+    if win.side_art_surface: win.side_art_surface = ensure_xrender_surf(cr, win.side_art_surface)
+    if win.chain_surface: win.chain_surface = ensure_xrender_surf(cr, win.chain_surface)
+    if win.table_side_surface: win.table_side_surface = ensure_xrender_surf(cr, win.table_side_surface)
+    if win.table_top_surface: win.table_top_surface = ensure_xrender_surf(cr, win.table_top_surface)
+    if win.table_bottom_surface: win.table_bottom_surface = ensure_xrender_surf(cr, win.table_bottom_surface)
+    if win.progress_bar_surface: win.progress_bar_surface = ensure_xrender_surf(cr, win.progress_bar_surface)
 
     if win.active_game_scene:
         win.active_game_scene.draw(cr, 1280, 720)
@@ -88,29 +102,34 @@ def draw_home_screen(win, cr):
             cr.set_source(pattern)
             cr.rectangle(0, 0, 1280, 720)
             cr.fill()
+            cr.set_operator(cairo.Operator.OVER)
         cr.restore()
 
     if not win.creator_menu_active and not win.my_levels_active and not win.level_view_active:
         cr.save()
         ground_y = win.ground_y_level_select if win.level_select_active else win.ground_y
         col = LEVEL_COLORS[win.current_level_index % len(LEVEL_COLORS)] if win.level_select_active else (r, g, b_val)
+        
         if win.ground_surface and win.ground_pb:
             cr.save()
             cr.rectangle(0, ground_y, 1280, 720 - ground_y)
             cr.clip()
-            offset_x = win.ground_x_offset if win.level_select_active else win.ground_x_offset - win.ground_scroll_x
             
-            cr.set_source_rgb(col[0] * 0.45, col[1] * 0.45, col[2] * 0.45)
+            dark_r, dark_g, dark_b = col[0] * 0.45, col[1] * 0.45, col[2] * 0.45
+            cr.set_source_rgb(dark_r, dark_g, dark_b)
             cr.paint()
             
+            offset_x = (win.ground_x_offset if win.level_select_active else win.ground_x_offset - win.ground_scroll_x)
             pattern = cairo.SurfacePattern(win.ground_surface)
             pattern.set_extend(cairo.Extend.REPEAT)
             inv_s = 1.0 / win.ground_tile_scale if win.ground_tile_scale > 0 else 1.0
             matrix = cairo.Matrix(inv_s, 0.0, 0.0, inv_s, -inv_s * offset_x, -inv_s * ground_y)
             pattern.set_matrix(matrix)
+            
             cr.set_operator(cairo.Operator.MULTIPLY)
             cr.set_source(pattern)
             cr.paint()
+            cr.set_operator(cairo.Operator.OVER)
             cr.restore()
 
         if win.floor_line_surface:
@@ -128,6 +147,7 @@ def draw_home_screen(win, cr):
     cr.scale(win.zoom, win.zoom)
     if win.creator_menu_active:
         for elem in win.creator_elements:
+            if elem.surface: elem.surface = ensure_xrender_surf(cr, elem.surface)
             cr.save()
             cr.translate(elem.x, elem.y)
             cr.scale(elem.current_scale, elem.current_scale)
@@ -141,6 +161,7 @@ def draw_home_screen(win, cr):
         draw_level_view_screen(win, cr)
     elif not win.level_select_active:
         for elem in win.elements:
+            if elem.surface: elem.surface = ensure_xrender_surf(cr, elem.surface)
             cr.save()
             cr.translate(elem.x, elem.y)
             cr.scale(elem.current_scale, elem.current_scale)
@@ -170,11 +191,12 @@ def draw_home_screen(win, cr):
         lvl_val = LEVELS[win.current_level_index]["Val"]
         if lvl_val in win.diff_icons:
             _, surf, dw_orig, _ = win.diff_icons[lvl_val]
+            xsurf = ensure_xrender_surf(cr, surf)
             cr.save()
             cr.translate(diff_x, diff_y)
             icon_scale = win.diff_size / dw_orig
             cr.scale(icon_scale, icon_scale)
-            cr.set_source_surface(surf, -dw_orig / 2.0, -dw_orig / 2.0)
+            cr.set_source_surface(xsurf, -dw_orig / 2.0, -dw_orig / 2.0)
             cr.paint()
             cr.restore()
         if win.big_font and win.big_font.surface:
@@ -203,6 +225,7 @@ def draw_home_screen(win, cr):
 
     if win.level_select_active:
         for elem in win.ls_elements:
+            if elem.surface: elem.surface = ensure_xrender_surf(cr, elem.surface)
             cr.save()
             cr.translate(elem.x, elem.y)
             pw = elem.pixbuf.get_width() if elem.pixbuf else 100.0
@@ -254,6 +277,7 @@ def draw_home_screen(win, cr):
         cr.restore()
 
         if win.settings_close_surface:
+            win.settings_close_surface = ensure_xrender_surf(cr, win.settings_close_surface)
             cr.save()
             cr.translate(54.5, 49.5)
             scale_val = win.creator_back_btn.current_scale * 0.563
@@ -275,6 +299,7 @@ def draw_home_screen(win, cr):
         draw_newgrounds_popup(cr, win)
     
     if win.overlay_opacity > 0.0 and win.overlay_element.surface:
+        win.overlay_element.surface = ensure_xrender_surf(cr, win.overlay_element.surface)
         elem = win.overlay_element
         cr.save()
         cr.translate(elem.x, elem.y)
@@ -399,6 +424,7 @@ def draw_my_levels_screen(win, cr):
 
         iw_time_half = (win.time_icon_pb.get_width() if win.time_icon_pb else 50.0) / 2.0
         if win.time_icon_surface and win.time_icon_pb:
+            win.time_icon_surface = ensure_xrender_surf(cr, win.time_icon_surface)
             cr.save()
             cr.translate(left + win.time_icon_x, row_y + win.time_icon_y)
             cr.scale(win.time_icon_scale, win.time_icon_scale)
@@ -447,6 +473,7 @@ def draw_my_levels_screen(win, cr):
         music_icon_start_x = right_time_text + win.music_icon_gap + iw_music_half * win.music_icon_scale
 
         if win.music_icon_surface and win.music_icon_pb:
+            win.music_icon_surface = ensure_xrender_surf(cr, win.music_icon_surface)
             cr.save()
             cr.translate(music_icon_start_x, row_y + win.music_icon_y)
             cr.scale(win.music_icon_scale, win.music_icon_scale)
@@ -494,6 +521,7 @@ def draw_my_levels_screen(win, cr):
         info_icon_start_x = right_music_text + win.info_icon_gap + iw_info_half * win.info_icon_scale
 
         if win.info_icon_surface and win.info_icon_pb:
+            win.info_icon_surface = ensure_xrender_surf(cr, win.info_icon_surface)
             cr.save()
             cr.translate(info_icon_start_x, row_y + win.info_icon_y)
             cr.scale(win.info_icon_scale, win.info_icon_scale)
@@ -612,6 +640,7 @@ def draw_my_levels_screen(win, cr):
         cr.restore()
 
     if win.arrow_01_surface:
+        win.arrow_01_surface = ensure_xrender_surf(cr, win.arrow_01_surface)
         cr.save()
         cr.translate(win.settings_close_x, win.settings_close_y)
         scale_val = win.my_levels_btn_back.current_scale * 0.563
@@ -627,6 +656,7 @@ def draw_my_levels_screen(win, cr):
     cr.translate(win.new_btn_x, win.new_btn_y)
     cr.scale(win.my_levels_btn_new.current_scale * win.new_btn_scale, win.my_levels_btn_new.current_scale * win.new_btn_scale)
     if win.new_btn_surface and win.new_btn_pb:
+        win.new_btn_surface = ensure_xrender_surf(cr, win.new_btn_surface)
         iw = win.new_btn_pb.get_width()
         ih = win.new_btn_pb.get_height()
         cr.set_source_surface(win.new_btn_surface, -iw/2.0, -ih/2.0)
@@ -773,6 +803,7 @@ def draw_level_view_screen(win, cr):
             pb = win.share_btn_pb
 
         if surface and pb:
+            surface = ensure_xrender_surf(cr, surface)
             cr.scale(scale, -scale)
             cr.rotate(math.radians(90))
             iw = pb.get_width()
@@ -804,6 +835,7 @@ def draw_level_view_screen(win, cr):
     cr.translate(1230.0, 48.0)
     scale_del = win.level_view_btn_delete.current_scale
     if win.delete_btn_surface and win.delete_btn_pb:
+        win.delete_btn_surface = ensure_xrender_surf(cr, win.delete_btn_surface)
         cr.scale(0.8 * scale_del, -0.8 * scale_del)
         cr.rotate(math.radians(90))
         iw = win.delete_btn_pb.get_width()

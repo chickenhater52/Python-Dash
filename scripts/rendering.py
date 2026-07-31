@@ -2,6 +2,30 @@ import math
 import cairo
 from config import LEVELS
 
+_scale9_cache = {}
+_xrender_surfaces = set()
+
+def clear_scale9_cache():
+    _scale9_cache.clear()
+
+def ensure_xrender_surf(cr, surf):
+    if surf is None:
+        return None
+    if id(surf) in _xrender_surfaces or type(surf).__name__ == 'XlibSurface':
+        return surf
+    try:
+        w = surf.get_width()
+        h = surf.get_height()
+        target = cr.get_target()
+        similar = target.create_similar(cairo.CONTENT_COLOR_ALPHA, w, h)
+        xcr = cairo.Context(similar)
+        xcr.set_source_surface(surf, 0, 0)
+        xcr.paint()
+        _xrender_surfaces.add(id(similar))
+        return similar
+    except Exception:
+        return surf
+
 def draw_rounded_rect(cr, x, y, w, h, r):
     cr.new_sub_path()
     cr.arc(x + r, y + r, r, math.pi, 1.5 * math.pi)
@@ -10,9 +34,7 @@ def draw_rounded_rect(cr, x, y, w, h, r):
     cr.arc(x + r, y + h - r, r, 0.5 * math.pi, math.pi)
     cr.close_path()
 
-def draw_scale9(cr, surface, pixbuf, cx, cy, w, h, corner_scale=1.0):
-    if not surface or not pixbuf:
-        return
+def _render_scale9_raw(cr, surface, pixbuf, cx, cy, w, h, corner_scale=1.0):
     sw = pixbuf.get_width()
     sh = pixbuf.get_height()
     
@@ -76,6 +98,35 @@ def draw_scale9(cr, surface, pixbuf, cx, cy, w, h, corner_scale=1.0):
             cr.get_source().set_filter(cairo.Filter.BILINEAR)
             cr.paint()
             cr.restore()
+
+def draw_scale9(cr, surface, pixbuf, cx, cy, w, h, corner_scale=1.0):
+    if not surface or not pixbuf or w <= 0 or h <= 0:
+        return
+    
+    iw, ih = int(round(w)), int(round(h))
+    cache_key = (id(surface), iw, ih, round(corner_scale, 2))
+    
+    target = cr.get_target()
+    cached = _scale9_cache.get(cache_key)
+    
+    if cached is None:
+        try:
+            similar = target.create_similar(cairo.CONTENT_COLOR_ALPHA, iw, ih)
+            xcr = cairo.Context(similar)
+            _render_scale9_raw(xcr, surface, pixbuf, iw / 2.0, ih / 2.0, iw, ih, corner_scale)
+            cached = similar
+            _scale9_cache[cache_key] = cached
+            if len(_scale9_cache) > 200:
+                _scale9_cache.clear()
+                _scale9_cache[cache_key] = cached
+        except Exception:
+            _render_scale9_raw(cr, surface, pixbuf, cx, cy, w, h, corner_scale)
+            return
+
+    cr.save()
+    cr.set_source_surface(cached, cx - iw / 2.0, cy - ih / 2.0)
+    cr.paint()
+    cr.restore()
 
 def draw_procedural_diff_icon(cr, cx, cy, level_index):
     lvl_data, val = LEVELS[level_index], LEVELS[level_index]["Val"]
